@@ -1,0 +1,60 @@
+jps
+start-all.sh
+mr-jobhistory-daemon.sh start historyserver
+
+pig
+
+REGISTER '/home/acadgild/pig-0.16.0/contrib/piggybank/java/src/main/java/org/apache/pig/piggybank/storage/CSVExcelStorage.java';
+
+hadoop fs -put /home/acadgild/Desktop/Assignment/proj2_dataset.csv		
+hadoop fs -ls
+
+--Flume Config File setup
+agent1.sources = mysrc
+agent1.sinks = hdfsdest
+agent1.channels = mychannel
+
+agent1.sources.mysrc.type = exec
+agent1.sources.mysrc.command = hadoop dfs -put /home/acadgild/Desktop/Assignment/proj2_dataset.csv 
+
+agent1.sinks.hdfsdest.type = hdfs
+agent1.sinks.hdfsdest.hdfs.path = hdfs://localhost:9000/Titanic_dataset
+
+agent1.channels.mychannel.type = memory
+
+agent1.sources.mysrc.channels = mychannel
+agent1.sinks.hdfsdest.channel = mychannel
+
+bin/flume-ng agent --conf conf --conf-file proj2.conf --name agent1 -Dflume.root.logger=INFO,console
+
+
+--Load Data Set
+Consumer= LOAD '/user/acadgild/proj2_dataset.csv' USING org.apache.pig.piggybank.storage.CSVExcelStorage(',','NO_MULTILINE','UNIX','SKIP_INPUT_HEADER') as (date_received:chararray,product:chararray,sub_product:chararray,issue:chararray,sub_issue:chararray,consumer_complaint_narrative:chararray,company_public_response:chararray,company:chararray,state:chararray,zipcode:chararray,submitted_via:chararray,date_sent:chararray,Conpany_response_to_Consumer:chararray,Timely_response:chararray,Consumer_disputed:chararray,complat_id:chararray);
+
+--Count of Timely Response
+
+grp_Time_response= GROUP Consumer by Timely_response;
+Count_Time_Response = FOREACH grp_Time_response generate group,COUNT(Consumer);
+FILT_Time_response= FILTER Count_Time_Response by group == 'Yes';
+dump FILT_Time_response;
+
+--Count of complaint on the same Day
+
+Consumer1= LOAD '/user/acadgild/proj2_dataset.csv' USING org.apache.pig.piggybank.storage.CSVExcelStorage(',','NO_MULTILINE','UNIX','SKIP_INPUT_HEADER') as (date_received:chararray,product:chararray,sub_product:chararray,issue:chararray,sub_issue:chararray,consumer_complaint_narrative:chararray,company_public_response:chararray,company:chararray,state:chararray,zipcode:chararray,submitted_via:chararray,date_sent:chararray,Conpany_response_to_Consumer:chararray,Timely_response:chararray,Consumer_disputed:chararray,complat_id:chararray);
+
+join_Consumer = join Consumer by date_received, Consumer1 by date_sent;
+fltr_join_consumer =  FILTER join_Consumer by Consumer::complat_id == Consumer1::complat_id;
+
+--List of Companies topping in complaint chart
+
+grp_Company  = Group Consumer by company;
+Count_Company  =  FOREACH grp_Company generate group as Comp,COUNT(Consumer.complat_id) as Cnt;
+
+
+
+
+
+
+
+
+
